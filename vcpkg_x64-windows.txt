@@ -1,0 +1,2 @@
+openssl:x64-windows
+protobuf:x64-windows

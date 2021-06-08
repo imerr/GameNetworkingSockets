@@ -1,0 +1,70 @@
+name: CMake
+
+on: [push]
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally
+    # well on Windows or Mac.  You can convert this to a matrix build if you need
+    # cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+        matrix:
+            os: [ubuntu-latest, windows-latest, macos-latest]
+            arch: [x64]
+            build_type: [Release]
+            include:
+                - os: windows-latest
+                  artifact: bin/Release/*
+                  osname: windows
+                  triplet: x64-windows
+                  generator_type: VS16Win64
+                - os: ubuntu-latest
+                  artifact: bin/*
+                  osname: linux
+                  triplet: x64-linux
+                  generator_type: Ninja
+                - os: macos-latest
+                  artifact: bin/*
+                  osname: osx
+                  triplet: x64-osx
+                  generator_type: Ninja
+    steps:
+    - uses: actions/checkout@v2
+    - uses: seanmiddleditch/gha-setup-ninja@master
+    - name: Checkout submodules
+      shell: bash
+      run: git submodule update --init --recursive
+      
+    - uses: lukka/get-cmake@latest
+    - name: Set vcpkg's response file path used as part of cache's key.
+      uses: lukka/set-shell-env@master
+      with:
+        VCPKGRESPONSEFILE: ${{ github.workspace }}/vcpkg_${{ matrix.triplet }}.txt
+    - name: Restore artifacts, or run vcpkg, build and cache artifacts
+      uses: lukka/run-vcpkg@main
+      id: runvcpkg
+      with:
+        vcpkgArguments: '@${{ env.VCPKGRESPONSEFILE }}'
+        vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+        # Ensure the cache key changes any time the content of the response file changes.
+        appendedCacheKey: ${{ hashFiles( env.VCPKGRESPONSEFILE ) }}
+    - name: Run CMake
+      uses: lukka/run-cmake@main
+      id: runcmake
+      with:
+        useVcpkgToolchainFile: true
+        buildDirectory: '${{ runner.workspace }}/build'
+        cmakeBuildType: '${{ matrix.build_type }}'
+        cmakeGenerator: '${{ matrix.generator_type }}'
+    - uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.osname }}_${{ matrix.arch }}
+        path: ${{runner.workspace}}/build/${{ matrix.artifact }}
+    - name: Test
+      working-directory: ${{runner.workspace}}/build
+      shell: bash
+      # Execute tests defined by the CMake configuration.  
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: ctest -C $BUILD_TYPE

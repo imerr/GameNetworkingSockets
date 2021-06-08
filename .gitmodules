@@ -5,3 +5,6 @@
 [submodule "src/external/webrtc"]
 	path = src/external/webrtc
 	url = https://webrtc.googlesource.com/src
+[submodule "vcpkg"]
+	path = vcpkg
+	url = git://github.com/microsoft/vcpkg.git
